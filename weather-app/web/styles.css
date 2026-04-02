@@ -1,0 +1,153 @@
+:root {
+  --bg: linear-gradient(180deg, #6bc1ff 0%, #f2f9ff 75%);
+  --card: rgba(255, 255, 255, 0.87);
+  --border: rgba(0, 0, 0, 0.12);
+  --text: #1f2d3d;
+  --sub: #5a5a5a;
+  --accent: #2b8cff;
+  --good: #2ed573;
+  --bad: #ff4757;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.app-header h1 {
+  font-size: 2.1rem;
+  letter-spacing: 0.4px;
+  margin: 0;
+}
+
+.app-header p {
+  color: var(--sub);
+  margin: 6px 0 0;
+}
+
+.input-card,
+.weather-card,
+.grid-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.input-card {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  flex-wrap: wrap;
+}
+
+.input-card input {
+  flex: 1;
+  min-width: 180px;
+  font-size: 1rem;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.input-card button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+}
+
+#fetchBtn {
+  background: var(--accent);
+}
+
+#compareBtn {
+  background: #555;
+}
+
+.input-card button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.weather-card {
+  margin-top: 16px;
+  padding: 20px;
+}
+
+.hidden {
+  display: none;
+}
+
+.weather-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.weather-title {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.weather-temp {
+  font-size: 3rem;
+  font-weight: 800;
+}
+
+.grid-card {
+  display: grid;
+  margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.city-block {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 14px;
+}
+
+.city-block h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.city-block p {
+  margin: 4px 0;
+  color: var(--sub);
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    padding: 12px;
+  }
+  .app-header h1 {
+    font-size: 1.8rem;
+  }
+  .weather-temp {
+    font-size: 2.4rem;
+  }
+}
