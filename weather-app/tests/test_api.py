@@ -81,6 +81,24 @@ class TestOpenMeteoAPI:
         assert weather.temperature == 18.3
         assert weather.condition == "Mainly clear"
 
+    def test_get_weather_valid_current_payload(self):
+        """Test get_weather returns WeatherData when current payload is complete"""
+        valid_current = {
+            "temperature_2m": 20.0,
+            "relative_humidity_2m": 50,
+            "weather_code": 0,
+            "wind_speed_10m": 5.0
+        }
+
+        weather_obj = OpenMeteoAPI._to_weather_data(valid_current, 40.0, -3.0, "TestCity")
+
+        assert weather_obj is not None
+        assert weather_obj.city == "TestCity"
+        assert weather_obj.temperature == 20.0
+        assert weather_obj.humidity == 50
+        assert weather_obj.wind_speed == 5.0
+        assert weather_obj.condition == "Clear sky"
+
     def test_get_coordinates_invalid_city(self, monkeypatch):
         """Test getting coordinates for an invalid city"""
         def fake_get(url, params=None, timeout=None):
@@ -136,6 +154,102 @@ class TestOpenMeteoAPI:
                 })
             if url == OpenMeteoAPI.WEATHER_URL:
                 return TestOpenMeteoAPI.MockResponse({"detail": "Server error"}, status=500)
+            raise AssertionError("Unexpected URL")
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        coords = OpenMeteoAPI.get_coordinates("Paris")
+        assert coords is not None
+        weather = OpenMeteoAPI.get_weather(coords["latitude"], coords["longitude"], coords["name"])
+        assert weather is None
+
+    def test_get_weather_timeout(self, monkeypatch):
+        """Test timeout handling in weather fetch"""
+        def fake_get(url, params=None, timeout=None):
+            if url == OpenMeteoAPI.BASE_URL:
+                return TestOpenMeteoAPI.MockResponse({
+                    "results": [{
+                        "latitude": 48.8566,
+                        "longitude": 2.3522,
+                        "name": "Paris",
+                        "country": "France"
+                    }]
+                })
+            if url == OpenMeteoAPI.WEATHER_URL:
+                raise requests.exceptions.Timeout("Request timed out")
+            raise AssertionError("Unexpected URL")
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        coords = OpenMeteoAPI.get_coordinates("Paris")
+        assert coords is not None
+        weather = OpenMeteoAPI.get_weather(coords["latitude"], coords["longitude"], coords["name"])
+        assert weather is None
+
+    def test_get_weather_http_500(self, monkeypatch):
+        """Test HTTP 500 handling in weather fetch"""
+        def fake_get(url, params=None, timeout=None):
+            if url == OpenMeteoAPI.BASE_URL:
+                return TestOpenMeteoAPI.MockResponse({
+                    "results": [{
+                        "latitude": 48.8566,
+                        "longitude": 2.3522,
+                        "name": "Paris",
+                        "country": "France"
+                    }]
+                })
+            if url == OpenMeteoAPI.WEATHER_URL:
+                return TestOpenMeteoAPI.MockResponse({"detail": "Internal Server Error"}, status=500)
+            raise AssertionError("Unexpected URL")
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        coords = OpenMeteoAPI.get_coordinates("Paris")
+        assert coords is not None
+        weather = OpenMeteoAPI.get_weather(coords["latitude"], coords["longitude"], coords["name"])
+        assert weather is None
+
+    def test_get_weather_invalid_json(self, monkeypatch):
+        """Test JSON decode error handling in weather fetch"""
+        class BadJsonResponse(TestOpenMeteoAPI.MockResponse):
+            def json(self):
+                raise json.JSONDecodeError("Expecting value", "", 0)
+
+        def fake_get(url, params=None, timeout=None):
+            if url == OpenMeteoAPI.BASE_URL:
+                return TestOpenMeteoAPI.MockResponse({
+                    "results": [{
+                        "latitude": 48.8566,
+                        "longitude": 2.3522,
+                        "name": "Paris",
+                        "country": "France"
+                    }]
+                })
+            if url == OpenMeteoAPI.WEATHER_URL:
+                return BadJsonResponse(None)
+            raise AssertionError("Unexpected URL")
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        coords = OpenMeteoAPI.get_coordinates("Paris")
+        assert coords is not None
+        weather = OpenMeteoAPI.get_weather(coords["latitude"], coords["longitude"], coords["name"])
+        assert weather is None
+
+    def test_get_weather_response_missing_current(self, monkeypatch):
+        """Test response without current field in weather fetch"""
+        def fake_get(url, params=None, timeout=None):
+            if url == OpenMeteoAPI.BASE_URL:
+                return TestOpenMeteoAPI.MockResponse({
+                    "results": [{
+                        "latitude": 48.8566,
+                        "longitude": 2.3522,
+                        "name": "Paris",
+                        "country": "France"
+                    }]
+                })
+            if url == OpenMeteoAPI.WEATHER_URL:
+                return TestOpenMeteoAPI.MockResponse({})
             raise AssertionError("Unexpected URL")
 
         monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)

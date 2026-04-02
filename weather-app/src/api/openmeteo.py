@@ -1,8 +1,19 @@
 """Open-Meteo API integration"""
+import json
+import logging
 import re
 import requests
 from datetime import datetime
 from src.models.weather import WeatherData
+from config import settings
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    filename=settings.LOG_FILE,
+    filemode="a"
+)
 
 
 def is_valid_city_name(city_name: str) -> bool:
@@ -64,36 +75,98 @@ class OpenMeteoAPI:
             return None
     
     @staticmethod
-    def get_weather(latitude: float, longitude: float, city_name: str) -> WeatherData:
-        """Fetch weather data for given coordinates"""
-        try:
-            params = {
-                "latitude": latitude,
-                "longitude": longitude,
-                "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
-                "timezone": "auto"
-            }
-            response = requests.get(OpenMeteoAPI.WEATHER_URL, params=params, timeout=5)
-            response.raise_for_status()
-            
-            data = response.json()
-            current = data.get("current", {})
-            
-            weather_data = WeatherData(
-                city=city_name,
-                latitude=latitude,
-                longitude=longitude,
-                temperature=current.get("temperature_2m", 0),
-                humidity=current.get("relative_humidity_2m", 0),
-                wind_speed=current.get("wind_speed_10m", 0),
-                condition=OpenMeteoAPI._get_condition(current.get("weather_code", 0)),
-                timestamp=datetime.now()
-            )
-            
-            return weather_data
-        except Exception as e:
-            print(f"Error fetching weather data: {e}")
+    def _weather_params(latitude: float, longitude: float) -> dict:
+        return {
+            "latitude": latitude,
+            "longitude": longitude,
+            "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
+            "timezone": "auto"
+        }
+
+    @staticmethod
+    def _to_weather_data(current: dict, latitude: float, longitude: float, city_name: str) -> WeatherData:
+        temperature = current.get("temperature_2m")
+        humidity = current.get("relative_humidity_2m")
+        wind_speed = current.get("wind_speed_10m")
+        weather_code = current.get("weather_code")
+
+        if temperature is None or humidity is None or wind_speed is None or weather_code is None:
+            logger.warning("Incomplete weather data received from API")
             return None
+
+        return WeatherData(
+            city=city_name,
+            latitude=latitude,
+            longitude=longitude,
+            temperature=temperature,
+            humidity=humidity,
+            wind_speed=wind_speed,
+            condition=OpenMeteoAPI._get_condition(weather_code),
+            timestamp=datetime.now()
+        )
+
+    @staticmethod
+    def get_weather(latitude: float, longitude: float, city_name: str):
+        """Fetch weather data for given coordinates.
+
+        Parameters
+        ----------
+        latitude : float
+            Latitude of the desired location (e.g. 40.4168).
+        longitude : float
+            Longitude of the desired location (e.g. -3.7038).
+        city_name : str
+            User-friendly city name to include in response model.
+
+        Returns
+        -------
+        WeatherData | None
+            WeatherData instance when successful, otherwise None on error.
+
+        Notes
+        -----
+        - Se comunica con Open-Meteo a través de `OpenMeteoAPI.WEATHER_URL`.
+        - Usa `settings.API_TIMEOUT` para timeout.
+        - Verifica que exista el campo "current" y que contenga valores clave.
+        - Maneja los errores: timeout, connection error, HTTP 4xx/5xx, JSON inválido.
+
+        Example
+        -------
+        >>> weather = OpenMeteoAPI.get_weather(40.4168, -3.7038, "Madrid")
+        >>> if weather:
+        ...     print(weather.temperature, weather.condition)
+        ... else:
+        ...     print("No weather data available")
+        """
+        params = OpenMeteoAPI._weather_params(latitude, longitude)
+
+        try:
+            response = requests.get(OpenMeteoAPI.WEATHER_URL, params=params, timeout=settings.API_TIMEOUT)
+            response.raise_for_status()
+            payload = response.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            logger.warning(f"Weather request failed: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Weather HTTP error: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Weather response invalid JSON: {e}")
+            return None
+        except Exception as e:
+            logger.exception(f"Unexpected error getting weather: {e}")
+            return None
+
+        current = payload.get("current")
+        if not isinstance(current, dict):
+            logger.error("Weather response missing current field")
+            return None
+
+        weather_data = OpenMeteoAPI._to_weather_data(current, latitude, longitude, city_name)
+        if weather_data is None:
+            logger.warning("Weather data conversion returned None")
+
+        return weather_data
     
     @staticmethod
     def _get_condition(weather_code: int) -> str:
