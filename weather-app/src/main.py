@@ -1,4 +1,5 @@
 """Main application entry point"""
+import re
 import sys
 from pathlib import Path
 
@@ -10,6 +11,13 @@ from src.utils.formatter import WeatherFormatter
 from config.settings import OUTPUT_FORMAT
 
 
+def is_valid_city_name(city_name: str) -> bool:
+    if not city_name or not city_name.strip():
+        return False
+    pattern = r"^[A-Za-zÀ-ÿ\u00f1\u00d1 .'-]+$"
+    return bool(re.match(pattern, city_name.strip()))
+
+
 def main():
     """Main application function"""
     print("\n" + "="*40)
@@ -18,10 +26,11 @@ def main():
     
     try:
         # Get city input from user
-        city = input("\nEnter city name: ").strip()
-        
-        if not city:
-            print("Error: City name cannot be empty")
+        city_input = input("\nEnter city name: ")
+        city = city_input.strip()
+
+        if not is_valid_city_name(city):
+            print("Error: City name cannot be empty or contener caracteres inválidos")
             return
         
         print(f"\nFetching weather data for {city}...")

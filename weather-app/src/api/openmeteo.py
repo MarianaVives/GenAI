@@ -1,7 +1,17 @@
 """Open-Meteo API integration"""
+import re
 import requests
 from datetime import datetime
 from src.models.weather import WeatherData
+
+
+def is_valid_city_name(city_name: str) -> bool:
+    """Validate city name input."""
+    if not city_name or not city_name.strip():
+        return False
+    normalized = city_name.strip()
+    pattern = r"^[A-Za-zÀ-ÿ\u00f1\u00d1 .'-]+$"
+    return bool(re.match(pattern, normalized))
 
 
 class OpenMeteoAPI:
@@ -13,9 +23,13 @@ class OpenMeteoAPI:
     @staticmethod
     def get_coordinates(city_name: str) -> dict:
         """Get latitude and longitude from city name"""
+        if not is_valid_city_name(city_name):
+            print("Error: invalid city name provided")
+            return None
+
         try:
             params = {
-                "name": city_name,
+                "name": city_name.strip(),
                 "count": 1,
                 "language": "en",
                 "format": "json"
