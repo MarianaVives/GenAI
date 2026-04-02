@@ -15,6 +15,10 @@ from datetime import datetime
 class TestOpenMeteoAPI:
     """Tests for OpenMeteoAPI"""
     
+    def setup_method(self, method):
+        OpenMeteoAPI._coords_cache.clear()
+        OpenMeteoAPI._weather_cache.clear()
+
     class MockResponse:
         def __init__(self, data, status=200):
             self._data = data
@@ -98,6 +102,47 @@ class TestOpenMeteoAPI:
         assert weather_obj.humidity == 50
         assert weather_obj.wind_speed == 5.0
         assert weather_obj.condition == "Clear sky"
+
+    def test_get_coordinates_cache(self, monkeypatch):
+        """Test that get_coordinates caches responses"""
+        def fake_get(url, params=None, timeout=None):
+            assert url == OpenMeteoAPI.BASE_URL
+            return TestOpenMeteoAPI.MockResponse({
+                "results": [{
+                    "latitude": 10.0,
+                    "longitude": 20.0,
+                    "name": "TestCity",
+                    "country": "TestLand"
+                }]
+            })
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        coords1 = OpenMeteoAPI.get_coordinates("TestCity")
+        coords2 = OpenMeteoAPI.get_coordinates("TestCity")
+
+        assert coords1 == coords2
+
+    def test_get_weather_cache(self, monkeypatch):
+        """Test that get_weather caches responses"""
+        def fake_get(url, params=None, timeout=None):
+            assert url == OpenMeteoAPI.WEATHER_URL
+            return TestOpenMeteoAPI.MockResponse({
+                "current": {
+                    "temperature_2m": 15.0,
+                    "relative_humidity_2m": 55,
+                    "weather_code": 2,
+                    "wind_speed_10m": 4.0
+                }
+            })
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        weather1 = OpenMeteoAPI.get_weather(40.0, -3.0, "TestCity")
+        weather2 = OpenMeteoAPI.get_weather(40.0, -3.0, "TestCity")
+
+        assert weather1 is not None
+        assert weather1 == weather2
 
     def test_get_coordinates_invalid_city(self, monkeypatch):
         """Test getting coordinates for an invalid city"""

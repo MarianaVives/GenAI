@@ -18,6 +18,71 @@ def is_valid_city_name(city_name: str) -> bool:
     return bool(re.match(pattern, city_name.strip()))
 
 
+def compare_multiple_cities(cities):
+    """Muestra el clima actual comparativo para varias ciudades."""
+    rows = []
+
+    for city in cities:
+        city = city.strip()
+        if not city:
+            continue
+
+        coords = OpenMeteoAPI.get_coordinates(city)
+        if coords is None:
+            rows.append({
+                "city": city,
+                "status": "Not found",
+                "temp": "-",
+                "humidity": "-",
+                "wind": "-",
+                "condition": "-"
+            })
+            continue
+
+        if coords.get("ambiguous"):
+            # prefer first autocasiado para ejecución batch
+            candidate = coords.get("choices", [None])[0]
+            if not candidate:
+                rows.append({
+                    "city": city,
+                    "status": "Ambiguous, no choice",
+                    "temp": "-",
+                    "humidity": "-",
+                    "wind": "-",
+                    "condition": "-"
+                })
+                continue
+            coords = candidate
+
+        weather = OpenMeteoAPI.get_weather(coords["latitude"], coords["longitude"], coords["name"])
+        if weather is None:
+            rows.append({
+                "city": coords.get("name", city),
+                "status": "API error",
+                "temp": "-",
+                "humidity": "-",
+                "wind": "-",
+                "condition": "-"
+            })
+            continue
+
+        rows.append({
+            "city": weather.city,
+            "status": "OK",
+            "temp": f"{weather.temperature}°C",
+            "humidity": f"{weather.humidity}%",
+            "wind": f"{weather.wind_speed} km/h",
+            "condition": weather.condition
+        })
+
+    print("\n" + "="*90)
+    print(f"{'City':20} | {'Status':12} | {'Temp':8} | {'Humidity':10} | {'Wind':10} | Condition")
+    print("-"*90)
+    for r in rows:
+        print(f"{r['city']:20} | {r['status']:12} | {r['temp']:8} | {r['humidity']:10} | {r['wind']:10} | {r['condition']}")
+    print("="*90)
+
+
 def main():
     """Main application function"""
     print("\n" + "="*40)
@@ -69,6 +134,24 @@ def main():
                 print(WeatherFormatter.format_simple(weather))
             else:
                 print(WeatherFormatter.format_weather(weather))
+
+            # Optional: 5-day forecast
+            forecast_answer = input("\nWould you like a 5-day forecast? (y/n): ").strip().lower()
+            if forecast_answer == 'y':
+                try:
+                    from src.api.openmeteo import fetch_5day_forecast, print_5day_forecast
+                    forecast_data = fetch_5day_forecast(coords['latitude'], coords['longitude'])
+                    print_5day_forecast(forecast_data, coords['name'])
+                except Exception as e:
+                    print(f"Error fetching 5-day forecast: {e}")
+
+            multi_answer = input("\nWould you like to compare multiple cities? (y/n): ").strip().lower()
+            if multi_answer == 'y':
+                cities_input = input("Enter city names separated by commas: ")
+                cities = [c.strip() for c in cities_input.split(",") if c.strip()]
+                if cities:
+                    compare_multiple_cities(cities)
+
         else:
             print("Error: Unable to fetch weather data")
     

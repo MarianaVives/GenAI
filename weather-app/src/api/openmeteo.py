@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+import time
 import requests
 from datetime import datetime
 from src.models.weather import WeatherData
@@ -25,11 +26,122 @@ def is_valid_city_name(city_name: str) -> bool:
     return bool(re.match(pattern, normalized))
 
 
+class TimedCache:
+    """Simple in-memory cache with TTL (time-to-live)."""
+
+    def __init__(self):
+        self._data = {}
+
+    def set(self, key: str, value, ttl_seconds: int):
+        expires_at = time.time() + ttl_seconds
+        self._data[key] = (value, expires_at)
+
+    def get(self, key: str):
+        record = self._data.get(key)
+        if not record:
+            return None
+
+        value, expires_at = record
+        if time.time() > expires_at:
+            self._data.pop(key, None)
+            return None
+
+        return value
+
+    def invalidate(self, key: str):
+        self._data.pop(key, None)
+
+    def clear(self):
+        self._data.clear()
+
+
+class WeatherCache:
+    """Cross-platform cache for weather data con caducidad (default 1 hora)."""
+
+    DEFAULT_TTL = 3600  # 1 hora
+
+    def __init__(self):
+        self._cache = TimedCache()
+
+    def get(self, key: str):
+        return self._cache.get(key)
+
+    def set(self, key: str, value):
+        self._cache.set(key, value, ttl_seconds=self.DEFAULT_TTL)
+
+    def invalidate(self, key: str):
+        self._cache.invalidate(key)
+
+    def clear(self):
+        self._cache.clear()
+
+
+weather_cache = WeatherCache()
+
+
+def get_weather_with_cache(key: str, fetch_fn):
+    """Devuelve datos cacheados si son válidos, o obtiene los datos con fetch_fn y los guarda."""
+    cached = weather_cache.get(key)
+    if cached is not None:
+        return cached
+
+    data = fetch_fn()
+    if data is not None:
+        weather_cache.set(key, data)
+    return data
+
+
+def fetch_5day_forecast(latitude: float, longitude: float, timezone: str = "auto") -> dict:
+    """Obtiene el pronóstico 5 días desde Open-Meteo."""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode",
+        "timezone": timezone,
+        "forecast_days": 5
+    }
+
+    response = requests.get(url, params=params, timeout=settings.API_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
+
+
+def print_5day_forecast(forecast_data: dict, city_name: str = "Unknown") -> None:
+    """Imprime en pantalla el pronóstico de 5 días en formato legible."""
+    daily = forecast_data.get("daily", {})
+    dates = daily.get("time", [])
+    tmax = daily.get("temperature_2m_max", [])
+    tmin = daily.get("temperature_2m_min", [])
+    rain = daily.get("precipitation_sum", [])
+    codes = daily.get("weathercode", [])
+
+    print("\n" + "="*50)
+    print(f"5-day forecast for {city_name}")
+    print("="*50)
+
+    for i, day in enumerate(dates):
+        d = datetime.fromisoformat(day).strftime("%a %d %b %Y")
+        maxv = tmax[i] if i < len(tmax) else "N/A"
+        minv = tmin[i] if i < len(tmin) else "N/A"
+        prcp = rain[i] if i < len(rain) else "N/A"
+        code = codes[i] if i < len(codes) else None
+        cond = OpenMeteoAPI._get_condition(code) if code is not None else "Unknown"
+
+        print(f"{d:20} | Max {maxv:5}°C | Min {minv:5}°C | Rain {prcp:5}mm | {cond}")
+
+    print("="*50)
+
+
 class OpenMeteoAPI:
     """Handle requests to Open-Meteo API"""
     
     BASE_URL = "https://geocoding-api.open-meteo.com/v1/search"
     WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+    _coords_cache = TimedCache()
+    _weather_cache = TimedCache()
+    COORDS_CACHE_TTL = 60 * 15  # 15 minutes
+    WEATHER_CACHE_TTL = 60 * 60  # 1 hour
     
     @staticmethod
     def get_coordinates(city_name: str) -> dict:
@@ -38,6 +150,11 @@ class OpenMeteoAPI:
             print("Error: invalid city name provided")
             return None
 
+        cache_key = f"coords:{city_name.strip().lower()}"
+        cached_coords = OpenMeteoAPI._coords_cache.get(cache_key)
+        if cached_coords is not None:
+            return cached_coords
+
         try:
             params = {
                 "name": city_name.strip(),
@@ -45,7 +162,7 @@ class OpenMeteoAPI:
                 "language": "en",
                 "format": "json"
             }
-            response = requests.get(OpenMeteoAPI.BASE_URL, params=params, timeout=5)
+            response = requests.get(OpenMeteoAPI.BASE_URL, params=params, timeout=settings.API_TIMEOUT)
             response.raise_for_status()
 
             data = response.json()
@@ -64,14 +181,17 @@ class OpenMeteoAPI:
                 })
 
             if len(choices) == 1:
+                OpenMeteoAPI._coords_cache.set(cache_key, choices[0], OpenMeteoAPI.COORDS_CACHE_TTL)
                 return choices[0]
 
-            return {
+            ambiguous_result = {
                 "ambiguous": True,
                 "choices": choices
             }
+            OpenMeteoAPI._coords_cache.set(cache_key, ambiguous_result, OpenMeteoAPI.COORDS_CACHE_TTL)
+            return ambiguous_result
         except Exception as e:
-            print(f"Error fetching coordinates: {e}")
+            logger.exception(f"Error fetching coordinates: {e}")
             return None
     
     @staticmethod
@@ -157,6 +277,11 @@ class OpenMeteoAPI:
             logger.exception(f"Unexpected error getting weather: {e}")
             return None
 
+        cache_key = f"weather:{latitude}:{longitude}:{city_name.strip().lower()}"
+        cached_weather = OpenMeteoAPI._weather_cache.get(cache_key)
+        if cached_weather is not None:
+            return cached_weather
+
         current = payload.get("current")
         if not isinstance(current, dict):
             logger.error("Weather response missing current field")
@@ -165,7 +290,9 @@ class OpenMeteoAPI:
         weather_data = OpenMeteoAPI._to_weather_data(current, latitude, longitude, city_name)
         if weather_data is None:
             logger.warning("Weather data conversion returned None")
+            return None
 
+        OpenMeteoAPI._weather_cache.set(cache_key, weather_data, OpenMeteoAPI.WEATHER_CACHE_TTL)
         return weather_data
     
     @staticmethod
