@@ -30,24 +30,35 @@ class OpenMeteoAPI:
         try:
             params = {
                 "name": city_name.strip(),
-                "count": 1,
+                "count": 10,
                 "language": "en",
                 "format": "json"
             }
             response = requests.get(OpenMeteoAPI.BASE_URL, params=params, timeout=5)
             response.raise_for_status()
-            
+
             data = response.json()
-            if data.get("results"):
-                result = data["results"][0]
-                return {
+            results = data.get("results", [])
+
+            if not results:
+                return None
+
+            choices = []
+            for result in results:
+                choices.append({
                     "latitude": result["latitude"],
                     "longitude": result["longitude"],
                     "name": result["name"],
                     "country": result.get("country", "Unknown")
-                }
-            else:
-                return None
+                })
+
+            if len(choices) == 1:
+                return choices[0]
+
+            return {
+                "ambiguous": True,
+                "choices": choices
+            }
         except Exception as e:
             print(f"Error fetching coordinates: {e}")
             return None

@@ -41,7 +41,19 @@ def main():
         if coords is None:
             print(f"Error: City '{city}' not found")
             return
-        
+
+        if coords.get("ambiguous"):
+            print("Multiple results found for city. Please select one:")
+            for idx, c in enumerate(coords["choices"], start=1):
+                print(f"  {idx}. {c['name']}, {c['country']} ({c['latitude']}, {c['longitude']})")
+
+            choice = input("Select option number: ").strip()
+            if not choice.isdigit() or not (1 <= int(choice) <= len(coords["choices"])):
+                print("Error: option inválida")
+                return
+
+            coords = coords["choices"][int(choice) - 1]
+
         print(f"Found: {coords['name']}, {coords['country']}")
         
         # Get weather data

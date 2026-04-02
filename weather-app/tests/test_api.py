@@ -96,6 +96,23 @@ class TestOpenMeteoAPI:
         coords = OpenMeteoAPI.get_coordinates("<script>")
         assert coords is None
 
+    def test_get_coordinates_ambiguous_city(self, monkeypatch):
+        """Ambiguous city name should return choices list"""
+        def fake_get(url, params=None, timeout=None):
+            return TestOpenMeteoAPI.MockResponse({
+                "results": [
+                    {"latitude": 39.78, "longitude": -89.64, "name": "Springfield", "country": "USA"},
+                    {"latitude": 44.05, "longitude": -123.02, "name": "Springfield", "country": "USA"}
+                ]
+            })
+
+        monkeypatch.setattr("src.api.openmeteo.requests.get", fake_get)
+
+        coords = OpenMeteoAPI.get_coordinates("Springfield")
+        assert coords is not None
+        assert coords.get("ambiguous") is True
+        assert len(coords.get("choices", [])) == 2
+
     def test_get_coordinates_timeout(self, monkeypatch):
         """Test timeout handling in coordinate lookup"""
         def fake_get(url, params=None, timeout=None):
