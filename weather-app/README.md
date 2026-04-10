@@ -53,6 +53,17 @@ weather-app/
 pip install -r requirements.txt
 ```
 
+3. Configure las variables de entorno:
+```bash
+# Copie el archivo de ejemplo
+cp .env.example .env
+
+# Edite .env con sus configuraciones
+# (Incluye API keys, puertos, niveles de logging, etc.)
+```
+
+⚠️ **Nota importante**: El archivo `.env` contiene información sensible y no debe ser commiteado. Está protegido automáticamente por `.gitignore`.
+
 ## Uso
 
 ### Interfaz de Línea de Comandos (CLI)
@@ -144,11 +155,32 @@ Los tests cubren:
 
 ## Configuración
 
-Edite `config/settings.py` para personalizar:
-- `API_TIMEOUT`: Timeout para consultas API
-- `CACHE_TTL`: Tiempo de vida del caché en segundos
-- `LOG_LEVEL`: Nivel de logging
-- `FORECAST_DAYS`: Días para pronóstico (por defecto 5)
+Las configuraciones se cargan desde el archivo `.env`. Edite este archivo para personalizar:
+
+### Variables de Entorno Disponibles:
+- `API_TIMEOUT`: Timeout para consultas API (default: 5 segundos)
+- `API_RETRIES`: Número de reintentos para solicitudes fallidas (default: 3)
+- `CACHE_ENABLED`: Habilitar caché (default: True)
+- `CACHE_DURATION`: Duración del caché en segundos (default: 600)
+- `LOG_LEVEL`: Nivel de logging: DEBUG, INFO, WARNING, ERROR (default: INFO)
+- `FLASK_PORT`: Puerto para el servidor Flask (default: 5000)
+- `FLASK_ENV`: Entorno: development o production (default: development)
+- `OUTPUT_FORMAT`: Formato de salida: detailed o simple (default: detailed)
+- `API_KEY`: Clave de API para servicio externo (si se integran otros servicios)
+- `FLASK_SECRET_KEY`: Clave secreta para Flask (cambiar en producción)
+
+Ver [SECURITY.md](SECURITY.md) para más información sobre protección de claves de API.
+
+## 🔐 Seguridad
+
+Para información detallada sobre cómo almacenar de forma segura las claves de API, credenciales y variables sensibles, consulta la [Guía de Seguridad](SECURITY.md).
+
+### Puntos clave:
+- ✅ Las claves se almacenan en `.env` (nunca en código)
+- ✅ Usa `.env.example` como plantilla para nuevos desarrolladores
+- ✅ El archivo `.env` está protegido por `.gitignore`
+- ✅ Crea claves seguras para producción con `secrets.token_hex(32)`
+- ✅ Usa variables diferentes para desarrollo y producción
 
 ## API Utilizada
 
@@ -162,6 +194,7 @@ Edite `config/settings.py` para personalizar:
 - `flask`: Servidor web y API REST
 - `pytest`: Framework de testing
 - `pytest-mock`: Mocking para tests
+- `python-dotenv`: Cargador de variables de entorno
 
 ## Ejemplo de Código
 
