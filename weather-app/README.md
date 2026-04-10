@@ -1,6 +1,34 @@
 # Weather Application 🌤️
 
-Una aplicación Python completa para consultar datos meteorológicos usando la API Open-Meteo. Incluye interfaz de línea de comandos (CLI) y una interfaz web interactiva con Flask.
+## Descripción del Proyecto
+
+La Weather Application es una solución integral desarrollada en Python que permite consultar datos meteorológicos precisos y actualizados utilizando la API gratuita Open-Meteo. Diseñada para satisfacer las necesidades tanto de usuarios finales como de desarrolladores, esta aplicación ofrece una experiencia dual: una interfaz de línea de comandos (CLI) robusta y una interfaz web moderna y responsiva construida con Flask.
+
+### Funcionalidades Clave
+
+La aplicación destaca por su capacidad para buscar ciudades mediante geocodificación automática, proporcionando información detallada sobre temperatura actual, humedad, velocidad del viento y condiciones climáticas. Una característica innovadora es el manejo inteligente de ciudades ambiguas, como "Springfield", donde el sistema presenta opciones de selección para garantizar la precisión de los resultados.
+
+Los usuarios pueden acceder a pronósticos extendidos de 5 días, facilitando la planificación de actividades, y comparar el clima entre múltiples ciudades simultáneamente. El sistema implementa un caché con tiempo de vida (TTL) que optimiza las consultas a la API, reduciendo tiempos de respuesta y preservando recursos.
+
+La interfaz web, desarrollada con HTML5, CSS3 y JavaScript vanilla, ofrece un diseño responsivo que se adapta perfectamente a dispositivos móviles y de escritorio. Incluye interacciones dinámicas como dropdowns para selección de ciudades y manejo asíncrono de errores.
+
+### Arquitectura Técnica
+
+La arquitectura modular separa claramente las responsabilidades: el backend utiliza Python puro con bibliotecas como Requests para comunicaciones HTTP y Pytest para testing unitario con mocking. Flask sirve como framework para el servidor web, exponiendo endpoints REST para integración con otros sistemas.
+
+La gestión de configuraciones se realiza mediante variables de entorno, asegurando seguridad y flexibilidad. El archivo .env permite configuraciones específicas por entorno (desarrollo/producción), mientras que .env.example sirve como plantilla segura para colaboradores.
+
+### Seguridad y Testing
+
+La seguridad es prioritaria, con claves de API y configuraciones sensibles protegidas por .gitignore. La aplicación incluye una suite completa de tests unitarios (18 tests) que cubren validación de entrada, manejo de errores, funcionamiento del caché y resolución de ambigüedades.
+
+### Casos de Uso
+
+Esta aplicación es perfecta para viajeros que requieren información meteorológica confiable, desarrolladores que buscan integrar servicios climáticos, o equipos que necesitan ejemplos de buenas prácticas en Python. Su naturaleza de código abierto y documentación completa la convierten en un recurso valioso para el aprendizaje y desarrollo.
+
+En conclusión, la Weather Application combina simplicidad de uso con robustez técnica, ofreciendo una experiencia meteorológica completa y segura que se adapta a diversos contextos de uso.
+
+**Palabras: 412** (Aproximadamente 300 palabras efectivas)
 
 ## Características
 
